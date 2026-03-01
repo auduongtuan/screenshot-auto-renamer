@@ -12,6 +12,8 @@
     <string>/Users/tuan/Library/CloudStorage/Dropbox/screenshots</string>
     <string>--verbose</string>
     <string>--polling</string>
+    <string>--poll-interval-ms</string>
+    <string>300</string>
     <string>--use-gemini-summary</string>
     <string>--debug-gemini-prompt</string>
   </array>

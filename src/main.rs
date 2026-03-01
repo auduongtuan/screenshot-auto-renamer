@@ -226,16 +226,19 @@ fn process_path(cfg: &Config, ctx: &mut Context, path: &Path) -> Option<PathBuf>
     if should_skip_recent(path, &ctx.recently_processed) {
         return None;
     }
+
+    // Snapshot UI metadata as early as possible after file detection.
+    // This avoids title/app drift while waiting for file writes to finish.
+    let app_raw = frontmost_app();
+    let app = slugify(&app_raw, 40);
+    let title = slugify(&frontmost_window_title_with_fallback(&app_raw), 60);
+
     if !wait_until_stable(path, Duration::from_secs(8)) {
         if cfg.verbose {
             log_event("skip", &format!("reason=file_not_stable path={}", path.display()));
         }
         return None;
     }
-
-    let app_raw = frontmost_app();
-    let app = slugify(&app_raw, 40);
-    let title = slugify(&frontmost_window_title_with_fallback(&app_raw), 60);
     let ocr_raw = extract_ocr_text(ctx, path);
     let mut ocr = slugify(&ocr_raw, 80);
     if ocr == "unknown" {
@@ -694,6 +697,7 @@ fn build_gemini_prompt(app: &str, title: &str, ocr_text: &str) -> String {
 Rules:\n\
 - Output only the name segment (no extension).\n\
 - Exactly one line, 3 to 8 words.\n\
+- Keep the original language and diacritics from OCR if useful.\n\
 - Lowercase words separated by spaces.\n\
 - No quotes, no labels, no punctuation.\n\
 {no_ocr_rule}\n\
@@ -762,19 +766,20 @@ fn clean_text(text: &str, max_words: usize, max_len: usize) -> String {
     let mut out = String::new();
     let mut prev_space = false;
     for ch in text.replace(['\n', '\r'], " ").chars() {
-        let allowed = ch.is_ascii_alphanumeric() || ch == ' ' || ch == '_' || ch == '.' || ch == '-';
+        let allowed = ch.is_alphanumeric() || ch.is_whitespace() || ch == '_' || ch == '.' || ch == '-';
         if !allowed {
             continue;
         }
-        if ch == ' ' {
+        if ch.is_whitespace() {
             if prev_space {
                 continue;
             }
             prev_space = true;
+            out.push(' ');
         } else {
             prev_space = false;
+            out.push(ch);
         }
-        out.push(ch);
         if out.len() >= max_len {
             break;
         }

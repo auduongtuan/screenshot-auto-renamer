@@ -1,4 +1,0 @@
-# Optional:
-# watchdog==6.0.0
-#
-# Script also works without watchdog (polling fallback), useful in offline environments.
